@@ -122,3 +122,31 @@ against the same database on other ports, so its numbers were checked for the fi
   - 26-week cap in the API and 80 h max weekly hours. Product calls; kept 106 weeks / 168 h.
 - Also seen there: opening its editor doesn't select the value, so typing 36 over 40 gives
   "4036". This one selects on focus.
+
+## Final run and review
+
+- Clean run as a reviewer would do it: `docker compose down -v`, `make up`. Fresh seed, clean
+  `npm install`, no console errors, API still matches the seed recomputation (0 mismatches).
+- Code review of the branch; fixed, each with a test that fails without the fix:
+  - Leaving the weekly-hours editor (Tab out, click elsewhere) saved and then pulled focus back
+    to the cell's button. Focus now returns to the cell only on Enter/Save/Cancel/Escape.
+    Reproduced in the browser before fixing.
+  - A range that failed to load replaced the grid with a bare error box: placeholder data only
+    lives while a query is pending. The last loaded range now stays on screen, dimmed and
+    read-only, with what failed and a reload button. That fallback also covers "still loading",
+    so `keepPreviousData` went — one rule for what's shown until the requested range arrives.
+  - The optimistic update cancelled every capacity query, including the first load of a range
+    the manager had just moved to; that range sat on "Loading" until a save settled. Only
+    refetches of loaded ranges are cancelled now.
+  - Rollback took the person's capacity from the first cached range and wrote it into all of
+    them; now each range gets back its own previous value.
+  - Tests for navigation: previous range shown while the next loads, and a late answer for a
+    range the manager already left doesn't replace the current one.
+- Server messages without a full stop ran into the next sentence ("…bad gateway The numbers…").
+- Testing note: the in-app browser pane was hidden, and react-query pauses retries while the page
+  is hidden, so a failed load there sat on "Loading…". Not a bug for a visible tab; the failure
+  path is covered by tests with retries off.
+- Found and left (noted, not fixed): one `useMutation` observer per row (fine at 500, worth one
+  grid-level mutation at thousands); PATCH accepts trailing bytes after the JSON object; the
+  "Saving…" live region mounts with its text, so some screen readers won't announce it; the two
+  over-capacity counts walk the data separately; the hours parser rejects ".5" and "40.".
