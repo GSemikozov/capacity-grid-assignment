@@ -39,3 +39,46 @@ left unfinished. Append as you go; a line or two per entry is right.
   client can patch its cache with that response — no range refetch needed.
 - `weekly_hours` has no history: changing it rewrites capacity for every past week too.
   That's what the schema supports; noted as a product gap rather than worked around.
+
+## Web
+
+- Added `@tanstack/react-query`: per-range cache, `keepPreviousData` so week navigation never
+  blanks the grid, request abort on range change, optimistic mutation plumbing. Writing that
+  by hand is where the bugs would be.
+- The range lives in `App`, not the grid: the logged-time timeline that will sit beside this
+  view should follow the same weeks.
+- While a new range loads, the old one stays on screen dimmed, with "Loading X… still showing
+  Y". Column headers come from the response, not from the props, so the old numbers are never
+  shown under the new dates. Editing is paused during that window.
+- UI caps a range at 26 weeks (API allows 106). 500 rows × 26 weeks renders fine; thousands of
+  rows × two years would not without row virtualisation. Deferred.
+- Save flow: optimistic patch of the person in every cached range → server value on success →
+  on failure put back *that person's* previous capacity (a whole-cache snapshot restore would
+  also undo someone else's in-flight edit) and reopen the editor with the typed value, the
+  server's reason and a Retry button. After the last save settles, cached ranges are refetched
+  in the background — a failed response doesn't prove the write didn't land.
+- Verified in the browser: Dee 40→45 un-reds the 45 h week and drops the count 41→40; with
+  `docker compose stop api` the save shows "Not saved: The server had a problem (502)", the
+  grid goes back to 40, and a refresh banner says the numbers may be stale; Retry after
+  `docker compose start api` saves.
+- Found while testing: browser-native validation on `type=number` showed its own bubble instead
+  of our message → `noValidate`. A validation error also labelled the button "Retry" → only a
+  failed server save does now. After a failed save focus fell to `<body>` → it goes back into
+  the editor if the manager was still on that cell.
+- Found while testing: `onSettled` returned the refetch promise, so "Saving…" stayed up until the
+  whole range had reloaded. Not awaited any more.
+- The rollback test passed even with the rollback deleted — the follow-up refetch quietly fixed
+  the number. Made the fake server go down for the refetch too (the real failure mode), and
+  now the test fails without the rollback.
+- Two "Retry" buttons (refresh banner + editor) were ambiguous to a screen reader; the banner's
+  is "Reload capacity".
+- Phone width: two pinned columns covered all weeks; below 640px only the name is pinned.
+
+## Not done
+
+- People pagination / team scoping in the API and row virtualisation in the grid. The
+  endpoint returns the whole roster for the range.
+- Effective-dated capacity (see API notes) and holidays / time off.
+- Range in the URL, sorting/filtering to "over-allocated only".
+- No Go handler tests against a real database; the query was checked against an independent
+  recomputation from the seed instead (see API notes).
