@@ -93,8 +93,6 @@ export function WeeklyHoursCell({ person, disabled }: Props) {
     return (
       <form
         className="hours-editor"
-        // Our own messages, not the browser's validation bubble, so they match server errors.
-        noValidate
         onSubmit={(event) => {
           event.preventDefault()
           save()
@@ -103,11 +101,10 @@ export function WeeklyHoursCell({ person, disabled }: Props) {
         onBlur={onBlur}
       >
         <input
-          type="number"
+          // Text, not number: no browser validation bubble in place of our message,
+          // no value changed by the scroll wheel, and "37,5" works in comma locales.
+          type="text"
           inputMode="decimal"
-          min={0}
-          max={MAX_WEEKLY_HOURS}
-          step="any"
           aria-label={`Weekly hours for ${person.name}`}
           aria-invalid={editor.error ? true : undefined}
           aria-describedby={editor.error ? errorId : undefined}
@@ -153,9 +150,10 @@ export function WeeklyHoursCell({ person, disabled }: Props) {
 
 /** Returns the hours, or a message saying why the input isn't usable. */
 export function parseWeeklyHours(raw: string): number | string {
-  if (raw.trim() === '') return 'Enter weekly hours.'
-  const hours = Number(raw)
-  if (!Number.isFinite(hours)) return 'Enter a number.'
-  if (hours < 0 || hours > MAX_WEEKLY_HOURS) return `Must be between 0 and ${MAX_WEEKLY_HOURS}.`
+  const trimmed = raw.trim()
+  if (trimmed === '') return 'Enter weekly hours.'
+  if (!/^\d+(?:[.,]\d+)?$/.test(trimmed)) return 'Enter a number, like 32 or 37.5.'
+  const hours = Number(trimmed.replace(',', '.'))
+  if (hours > MAX_WEEKLY_HOURS) return `Must be between 0 and ${MAX_WEEKLY_HOURS}.`
   return hours
 }

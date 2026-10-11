@@ -67,7 +67,7 @@ const row = (name: string) => screen.getByRole('row', { name: new RegExp(name) }
 async function editWeeklyHours(name: string, value: string) {
   const user = userEvent.setup()
   await user.click(await screen.findByRole('button', { name: new RegExp(`Weekly hours for ${name}`) }))
-  const input = screen.getByRole('spinbutton', { name: `Weekly hours for ${name}` })
+  const input = screen.getByRole('textbox', { name: `Weekly hours for ${name}` })
   await user.clear(input)
   await user.type(input, `${value}{Enter}`)
   return user
@@ -116,7 +116,7 @@ describe('CapacityGrid', () => {
     save.resolve(json({ error: 'database unavailable' }, 500))
 
     expect(await screen.findByText('Not saved: database unavailable')).toBeInTheDocument()
-    expect(screen.getByRole('spinbutton', { name: 'Weekly hours for Dee Okafor' })).toHaveValue(45)
+    expect(screen.getByRole('textbox', { name: 'Weekly hours for Dee Okafor' })).toHaveValue('45')
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
     // The grid shows what is actually stored: 40 h, so the 45 h week is over again.
     expect(within(row('Dee Okafor')).getByText(/5 over capacity/)).toBeInTheDocument()
@@ -130,6 +130,13 @@ describe('CapacityGrid', () => {
     await editWeeklyHours('Dee Okafor', '200')
     expect(await screen.findByRole('alert')).toHaveTextContent('Must be between 0 and 168.')
     expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining('/api/people'), expect.anything())
+  })
+
+  it('accepts a decimal comma', async () => {
+    patchResponse = async () => json({ id: 4, name: 'Dee Okafor', weeklyHours: 37.5 })
+    renderGrid()
+    await editWeeklyHours('Dee Okafor', '37,5')
+    expect(fetchMock).toHaveBeenCalledWith('/api/people/4', expect.objectContaining({ body: '{"weeklyHours":37.5}' }))
   })
 
   it('cancels with Escape and returns focus to the cell', async () => {
