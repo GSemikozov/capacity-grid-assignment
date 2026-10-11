@@ -1,5 +1,5 @@
 import { type FocusEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
-import type { Person } from './api'
+import { ApiError, type Person } from './api'
 import { formatHours } from './format'
 import { useUpdateWeeklyHours } from './useCapacity'
 
@@ -14,8 +14,12 @@ type Props = {
 type Editor = {
   value: string
   error?: string
-  /** The server rejected or never answered this value; the submit button retries it. */
-  failedSave?: boolean
+  /**
+   * Set when saving this value failed; the submit button then retries it.
+   * 'rejected': the server answered with an error, so nothing changed.
+   * 'unanswered': no answer came back, so the write may or may not have landed.
+   */
+  failedSave?: 'rejected' | 'unanswered'
   /** Take focus when the manager opened the editor, or when they're still on this cell as a save fails. */
   autoFocus: boolean
 }
@@ -57,6 +61,7 @@ export function WeeklyHoursCell({ person, disabled }: Props) {
       setEditor({ ...editor, error: parsed })
       return
     }
+    const typed = editor.value
     close()
     if (parsed === person.weeklyHours) return
     mutation.mutate(
@@ -64,9 +69,8 @@ export function WeeklyHoursCell({ person, disabled }: Props) {
       {
         onError: (error) =>
           setEditor({
-            value: String(parsed),
-            error: `Not saved: ${error.message}`,
-            failedSave: true,
+            value: typed,
+            ...saveFailure(error),
             // Keep a keyboard user in place; don't pull focus from wherever they went next.
             autoFocus: document.activeElement === buttonRef.current,
           }),
@@ -109,7 +113,7 @@ export function WeeklyHoursCell({ person, disabled }: Props) {
           aria-invalid={editor.error ? true : undefined}
           aria-describedby={editor.error ? errorId : undefined}
           value={editor.value}
-          onChange={(event) => setEditor({ ...editor, value: event.target.value, error: undefined, failedSave: false })}
+          onChange={(event) => setEditor({ ...editor, value: event.target.value, error: undefined, failedSave: undefined })}
           autoFocus={editor.autoFocus}
           onFocus={(event) => event.currentTarget.select()}
         />
@@ -120,6 +124,7 @@ export function WeeklyHoursCell({ person, disabled }: Props) {
         {editor.error && (
           <p id={errorId} role="alert" className="hours-error">
             {editor.error}
+            {editor.failedSave === 'rejected' && ` Still ${formatHours(person.weeklyHours)} h.`}
           </p>
         )}
       </form>
@@ -146,6 +151,20 @@ export function WeeklyHoursCell({ person, disabled }: Props) {
       )}
     </span>
   )
+}
+
+function saveFailure(error: Error): Pick<Editor, 'error' | 'failedSave'> {
+  // Offline or a gateway timeout: the PATCH may have reached the database anyway.
+  // The refetch after every save shows what was actually stored.
+  if (error instanceof ApiError && (error.status === 0 || error.status === 504)) {
+    return { error: 'Couldn’t reach the server, so this may not have been saved.', failedSave: 'unanswered' }
+  }
+  // A 4xx carries a reason worth showing (out of range, person gone); a 5xx doesn't.
+  const reason =
+    error instanceof ApiError && error.status >= 500
+      ? `the server had a problem (${error.status})`
+      : error.message.replace(/\.$/, '')
+  return { error: `Not saved: ${reason}.`, failedSave: 'rejected' }
 }
 
 /** Returns the hours, or a message saying why the input isn't usable. */

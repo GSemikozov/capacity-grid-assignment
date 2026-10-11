@@ -115,7 +115,9 @@ describe('CapacityGrid', () => {
     serverDown = true
     save.resolve(json({ error: 'database unavailable' }, 500))
 
-    expect(await screen.findByText('Not saved: database unavailable')).toBeInTheDocument()
+    expect(await screen.findByText(/Not saved/)).toHaveTextContent(
+      'Not saved: the server had a problem (500). Still 40 h.',
+    )
     expect(screen.getByRole('textbox', { name: 'Weekly hours for Dee Okafor' })).toHaveValue('45')
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
     // The grid shows what is actually stored: 40 h, so the 45 h week is over again.
@@ -123,6 +125,18 @@ describe('CapacityGrid', () => {
     // Eli's row was never touched.
     expect(within(row('Eli Nakamura')).getByText(/20 over capacity/)).toBeInTheDocument()
     expect(await screen.findByText(/Couldn’t refresh: bad gateway/)).toBeInTheDocument()
+  })
+
+  it('says a save may not have landed when the server never answered', async () => {
+    patchResponse = () => Promise.reject(new TypeError('Failed to fetch'))
+    renderGrid()
+
+    await editWeeklyHours('Dee Okafor', '45')
+
+    expect(await screen.findByText(/may not have been saved/)).toHaveTextContent(
+      'Couldn’t reach the server, so this may not have been saved.',
+    )
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
   })
 
   it('rejects an impossible value without calling the server', async () => {
