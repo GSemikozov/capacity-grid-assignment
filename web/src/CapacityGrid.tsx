@@ -141,7 +141,7 @@ type PersonRowProps = {
 const PersonRow = memo(function PersonRow({ person, currentWeek, editable }: PersonRowProps) {
   return (
     <tr>
-      <th scope="row" className="col-name">
+      <th scope="row" className="col-name" title={person.name}>
         {person.name}
       </th>
       <td className="col-hours">

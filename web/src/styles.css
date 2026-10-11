@@ -173,6 +173,7 @@ button[aria-disabled='true'] {
 
 .grid .col-hours {
   position: sticky;
+  /* .col-name width plus its horizontal padding. */
   left: 12.2rem;
   z-index: 1;
   min-width: 7rem;
@@ -280,4 +281,24 @@ button[aria-disabled='true'] {
   font-size: 0.75rem;
   white-space: normal;
   color: var(--over-fg);
+}
+
+/* On a phone two pinned columns would cover the weeks; pin only the name. */
+@media (max-width: 640px) {
+  body {
+    padding: 1rem;
+  }
+
+  .grid .col-name {
+    min-width: 7.5rem;
+    max-width: 7.5rem;
+  }
+
+  .grid .col-hours {
+    left: auto;
+  }
+
+  .grid tbody .col-hours {
+    position: static;
+  }
 }
