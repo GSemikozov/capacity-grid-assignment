@@ -157,6 +157,33 @@ describe('CapacityGrid', () => {
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
   })
 
+  it('keeps the previous range on screen while the next one loads, and ignores a late answer', async () => {
+    const { showRange } = renderGrid()
+    expect(await screen.findByRole('columnheader', { name: /5 Jan/ })).toBeInTheDocument()
+
+    const slow = deferred()
+    rangeResponse[nextRange.from] = () => slow.promise
+    showRange(nextRange)
+
+    // Old numbers stay, labelled as old, under their own week headers.
+    expect(await screen.findByText(/still showing/)).toHaveTextContent(
+      'Loading 12 Jan 2026 – 25 Jan 2026… still showing 5 Jan 2026 – 18 Jan 2026.',
+    )
+    expect(weekHeader('5 Jan')).toBeInTheDocument()
+    expect(screen.getByRole('table')).toHaveAttribute('aria-busy', 'true')
+
+    // The manager moves on again before the slow range answers.
+    const later = shiftRange(range, 2)
+    showRange(later)
+    expect(await screen.findByRole('columnheader', { name: /26 Jan/ })).toBeInTheDocument()
+
+    slow.resolve(json({ ...stored, ...nextRange, weeks: [nextRange.from, addDays(nextRange.from, 7)] }))
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(weekHeader('26 Jan')).toBeInTheDocument()
+    expect(weekHeader('12 Jan')).not.toBeInTheDocument()
+    expect(screen.getByRole('table')).toHaveAttribute('aria-busy', 'false')
+  })
+
   it('keeps the last grid on screen when the next range fails to load', async () => {
     const { showRange } = renderGrid()
     expect(await screen.findByRole('columnheader', { name: /5 Jan/ })).toBeInTheDocument()
