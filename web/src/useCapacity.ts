@@ -1,4 +1,4 @@
-import { keepPreviousData, type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { type CapacityResponse, fetchCapacity, updateWeeklyHours } from './api'
 
 const capacityRoot = ['capacity'] as const
@@ -8,15 +8,11 @@ export function capacityKey(from: string, to: string) {
   return [...capacityRoot, from, to] as const
 }
 
-/**
- * Capacity for one range. While a new range loads, the previous one stays on
- * screen (`isPlaceholderData`), so navigating by week never blanks the grid.
- */
+/** Capacity for one range, cached per range. */
 export function useCapacity(from: string, to: string) {
   return useQuery({
     queryKey: capacityKey(from, to),
     queryFn: ({ signal }) => fetchCapacity(from, to, signal),
-    placeholderData: keepPreviousData,
   })
 }
 

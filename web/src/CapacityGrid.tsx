@@ -18,13 +18,13 @@ type Props = {
 // this view can follow the same weeks.
 export function CapacityGrid({ range, onRangeChange }: Props) {
   const query = useCapacity(range.from, range.to)
-  // The last range that loaded. Placeholder data covers a range that is still
-  // loading; this also covers one that failed, so a failed "Next week" leaves
-  // the grid the manager was reading on screen instead of an empty error box.
+  // Until the requested range has loaded — while it loads, or after it failed —
+  // the last range that did load stays on screen, labelled as such and
+  // read-only, so moving between weeks never blanks the grid.
   const [lastLoaded, setLastLoaded] = useState(query.data)
   if (query.data && query.data !== lastLoaded) setLastLoaded(query.data)
   const data = query.data ?? lastLoaded
-  const showingPrevious = query.isPlaceholderData || !query.data
+  const showingPrevious = !query.data
 
   return (
     <section className="capacity" aria-labelledby="capacity-heading">
