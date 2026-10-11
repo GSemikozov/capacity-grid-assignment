@@ -78,7 +78,8 @@ describe('CapacityGrid', () => {
     renderGrid()
     expect(await screen.findByText(/of 2 people are over capacity/)).toHaveTextContent(/^2 of 2 people/)
     expect(within(row('Dee Okafor')).getByText(/5 over capacity/)).toBeInTheDocument()
-    expect(within(row('Eli Nakamura')).getByText(/20 over capacity/)).toBeInTheDocument()
+    expect(within(row('Eli Nakamura')).getByText(/hours, no capacity/)).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: /5 Jan/ })).toHaveTextContent('2 over')
   })
 
   it('shows the new capacity straight away and keeps what the server stored', async () => {
@@ -123,7 +124,7 @@ describe('CapacityGrid', () => {
     // The grid shows what is actually stored: 40 h, so the 45 h week is over again.
     expect(within(row('Dee Okafor')).getByText(/5 over capacity/)).toBeInTheDocument()
     // Eli's row was never touched.
-    expect(within(row('Eli Nakamura')).getByText(/20 over capacity/)).toBeInTheDocument()
+    expect(within(row('Eli Nakamura')).getByText(/hours, no capacity/)).toBeInTheDocument()
     expect(await screen.findByText(/Couldn’t refresh: bad gateway/)).toBeInTheDocument()
   })
 

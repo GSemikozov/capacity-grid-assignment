@@ -95,6 +95,7 @@ function GridStatus({ data, requested, showingPrevious, refreshError, onRetry }:
 
 function Grid({ data, stale }: { data: CapacityResponse; stale: boolean }) {
   const currentWeek = data.weeks.indexOf(startOfWeek(localToday()))
+  const overPerWeek = data.weeks.map((_, i) => data.people.filter((p) => isOver(p.allocated[i], p.weeklyHours)).length)
   return (
     // Focusable so keyboard users can scroll a grid wider than the screen.
     <div className="grid-scroll" role="region" aria-label="Capacity grid" tabIndex={0}>
@@ -117,6 +118,7 @@ function Grid({ data, stale }: { data: CapacityResponse; stale: boolean }) {
                   W{String(isoWeek(week)).padStart(2, '0')}
                   {i === currentWeek && ' · this week'}
                 </span>
+                {overPerWeek[i] > 0 && <span className="week-over">{overPerWeek[i]} over</span>}
               </th>
             ))}
           </tr>
@@ -162,6 +164,8 @@ const PersonRow = memo(function PersonRow({ person, currentWeek, editable }: Per
 
 function AllocationCell({ hours, capacity, current }: { hours: number; capacity: number; current: boolean }) {
   const over = isOver(hours, capacity)
+  // With zero weekly hours, "+20" over nothing reads oddly; name the actual problem.
+  const overLabel = capacity > 0 ? `+${formatHours(hours - capacity)}` : 'no capacity'
   const load = capacity > 0 ? Math.min(hours / capacity, 1) : hours > 0 ? 1 : 0
   const className = ['alloc', over && 'alloc--over', hours === 0 && 'alloc--empty', current && 'is-current']
     .filter(Boolean)
@@ -171,11 +175,11 @@ function AllocationCell({ hours, capacity, current }: { hours: number; capacity:
       <span className="alloc-hours">{formatHours(hours)}</span>
       {over && (
         <span className="alloc-over" aria-hidden="true">
-          +{formatHours(hours - capacity)}
+          {overLabel}
         </span>
       )}
       <span className="sr-only">
-        {over ? ` hours, ${formatHours(hours - capacity)} over capacity` : ' hours'}
+        {!over ? ' hours' : capacity > 0 ? ` hours, ${formatHours(hours - capacity)} over capacity` : ' hours, no capacity'}
       </span>
     </td>
   )

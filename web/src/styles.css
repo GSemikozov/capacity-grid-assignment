@@ -200,6 +200,13 @@ button[aria-disabled='true'] {
   font-size: 0.75rem;
 }
 
+.week-over {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--over-fg);
+}
+
 .grid .is-current {
   background-image: linear-gradient(var(--current), var(--current));
 }
