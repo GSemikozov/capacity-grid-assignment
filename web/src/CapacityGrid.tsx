@@ -1,6 +1,6 @@
-import { memo, type CSSProperties } from 'react'
+import { type CSSProperties, memo, useState } from 'react'
 import type { CapacityResponse, PersonCapacity } from './api'
-import { formatHours } from './format'
+import { formatHours, sentence } from './format'
 import { RangeControls } from './RangeControls'
 import { useCapacity } from './useCapacity'
 import { WeeklyHoursCell } from './WeeklyHoursCell'
@@ -18,7 +18,13 @@ type Props = {
 // this view can follow the same weeks.
 export function CapacityGrid({ range, onRangeChange }: Props) {
   const query = useCapacity(range.from, range.to)
-  const { data } = query
+  // The last range that loaded. Placeholder data covers a range that is still
+  // loading; this also covers one that failed, so a failed "Next week" leaves
+  // the grid the manager was reading on screen instead of an empty error box.
+  const [lastLoaded, setLastLoaded] = useState(query.data)
+  if (query.data && query.data !== lastLoaded) setLastLoaded(query.data)
+  const data = query.data ?? lastLoaded
+  const showingPrevious = query.isPlaceholderData || !query.data
 
   return (
     <section className="capacity" aria-labelledby="capacity-heading">
@@ -27,14 +33,14 @@ export function CapacityGrid({ range, onRangeChange }: Props) {
       </h2>
       <RangeControls range={range} onChange={onRangeChange} />
 
-      {query.isPending ? (
+      {!data && query.isPending ? (
         <p role="status" className="notice">
           Loading capacity for {formatRange(range)}…
         </p>
       ) : !data ? (
         <div role="alert" className="notice notice--error">
           <p>
-            Couldn’t load capacity for {formatRange(range)}. {query.error?.message}
+            Couldn’t load capacity for {formatRange(range)}: {sentence(query.error?.message ?? 'unknown error')}
           </p>
           <button type="button" onClick={() => query.refetch()}>
             Try again
@@ -45,11 +51,11 @@ export function CapacityGrid({ range, onRangeChange }: Props) {
           <GridStatus
             data={data}
             requested={range}
-            showingPrevious={query.isPlaceholderData}
-            refreshError={query.isError ? query.error.message : null}
+            showingPrevious={showingPrevious}
+            error={query.isError ? query.error.message : null}
             onRetry={() => query.refetch()}
           />
-          <Grid data={data} stale={query.isPlaceholderData} />
+          <Grid data={data} stale={showingPrevious} />
         </>
       )}
     </section>
@@ -57,20 +63,22 @@ export function CapacityGrid({ range, onRangeChange }: Props) {
 }
 
 type GridStatusProps = {
+  /** What the grid shows: the requested range, or the last one that loaded. */
   data: CapacityResponse
   requested: WeekRange
+  /** `data` is an earlier range than `requested`: it is still loading or it failed. */
   showingPrevious: boolean
-  refreshError: string | null
+  error: string | null
   onRetry: () => void
 }
 
-function GridStatus({ data, requested, showingPrevious, refreshError, onRetry }: GridStatusProps) {
+function GridStatus({ data, requested, showingPrevious, error, onRetry }: GridStatusProps) {
   const overCount = data.people.filter((p) => p.allocated.some((hours) => isOver(hours, p.weeklyHours))).length
   return (
     <div className="grid-status">
       {/* Always mounted so screen readers announce changes to it. */}
       <p role="status" className="grid-summary">
-        {showingPrevious ? (
+        {showingPrevious && !error ? (
           <>
             Loading {formatRange(requested)}… still showing {formatRange(data)}.
           </>
@@ -81,9 +89,13 @@ function GridStatus({ data, requested, showingPrevious, refreshError, onRetry }:
           </>
         )}
       </p>
-      {refreshError && (
+      {error && (
         <div role="alert" className="notice notice--error">
-          <p>Couldn’t refresh: {refreshError} The numbers below may be out of date.</p>
+          <p>
+            {showingPrevious
+              ? `Couldn’t load ${formatRange(requested)}: ${sentence(error)} Still showing ${formatRange(data)}.`
+              : `Couldn’t refresh: ${sentence(error)} The numbers below may be out of date.`}
+          </p>
           <button type="button" onClick={onRetry}>
             Reload capacity
           </button>

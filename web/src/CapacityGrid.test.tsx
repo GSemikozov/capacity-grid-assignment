@@ -4,13 +4,16 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CapacityResponse } from './api'
 import { CapacityGrid } from './CapacityGrid'
+import { addDays, shiftRange, type WeekRange } from './weeks'
 
+// Every range in these tests is two weeks long, matching `allocated` below.
 const range = { from: '2026-01-05', to: '2026-01-18' }
+const nextRange = shiftRange(range, 1)
 
 function capacity(): CapacityResponse {
   return {
     ...range,
-    weeks: ['2026-01-05', '2026-01-12'],
+    weeks: [range.from, addDays(range.from, 7)],
     people: [
       { id: 4, name: 'Dee Okafor', weeklyHours: 40, allocated: [45, 40] },
       { id: 5, name: 'Eli Nakamura', weeklyHours: 0, allocated: [20, 0] },
@@ -35,16 +38,23 @@ function deferred() {
 let stored: CapacityResponse
 let serverDown: boolean
 let patchResponse: () => Promise<Response>
+// Per-range overrides for GET /api/capacity, keyed by `from`.
+let rangeResponse: Record<string, () => Promise<Response>>
 const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
   if (init?.method === 'PATCH') return patchResponse()
   if (serverDown) return json({ error: 'bad gateway' }, 502)
-  if (url.startsWith('/api/capacity')) return json(stored)
+  if (url.startsWith('/api/capacity')) {
+    const from = new URL(url, 'http://test').searchParams.get('from') ?? ''
+    if (rangeResponse[from]) return rangeResponse[from]()
+    return json({ ...stored, from, to: addDays(from, 13), weeks: [from, addDays(from, 7)] })
+  }
   throw new Error(`unexpected request ${url}`)
 })
 
 beforeEach(() => {
   stored = capacity()
   serverDown = false
+  rangeResponse = {}
   vi.stubGlobal('fetch', fetchMock)
 })
 
@@ -55,12 +65,17 @@ afterEach(() => {
 
 function renderGrid() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  render(
+  const grid = (shown: WeekRange) => (
     <QueryClientProvider client={queryClient}>
-      <CapacityGrid range={range} onRangeChange={() => {}} />
-    </QueryClientProvider>,
+      <CapacityGrid range={shown} onRangeChange={() => {}} />
+    </QueryClientProvider>
   )
+  const { rerender } = render(grid(range))
+  // The page owns the range; this stands in for it moving.
+  return { showRange: (next: WeekRange) => rerender(grid(next)) }
 }
+
+const weekHeader = (label: string) => screen.queryByRole('columnheader', { name: new RegExp(label) })
 
 const row = (name: string) => screen.getByRole('row', { name: new RegExp(name) })
 
@@ -125,7 +140,9 @@ describe('CapacityGrid', () => {
     expect(within(row('Dee Okafor')).getByText(/5 over capacity/)).toBeInTheDocument()
     // Eli's row was never touched.
     expect(within(row('Eli Nakamura')).getByText(/hours, no capacity/)).toBeInTheDocument()
-    expect(await screen.findByText(/Couldn’t refresh: bad gateway/)).toBeInTheDocument()
+    expect(await screen.findByText(/Couldn’t refresh/)).toHaveTextContent(
+      'Couldn’t refresh: bad gateway. The numbers below may be out of date.',
+    )
   })
 
   it('says a save may not have landed when the server never answered', async () => {
@@ -138,6 +155,26 @@ describe('CapacityGrid', () => {
       'Couldn’t reach the server, so this may not have been saved.',
     )
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
+  })
+
+  it('keeps the last grid on screen when the next range fails to load', async () => {
+    const { showRange } = renderGrid()
+    expect(await screen.findByRole('columnheader', { name: /5 Jan/ })).toBeInTheDocument()
+
+    rangeResponse[nextRange.from] = async () => json({ error: 'database unavailable' }, 500)
+    showRange(nextRange)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Couldn’t load 12 Jan 2026 – 25 Jan 2026: database unavailable. Still showing 5 Jan 2026 – 18 Jan 2026.',
+    )
+    expect(weekHeader('5 Jan')).toBeInTheDocument()
+    expect(row('Dee Okafor')).toBeInTheDocument()
+
+    delete rangeResponse[nextRange.from]
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Reload capacity' }))
+    expect(await screen.findByRole('columnheader', { name: /19 Jan/ })).toBeInTheDocument()
+    expect(weekHeader('5 Jan')).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('rejects an impossible value without calling the server', async () => {
