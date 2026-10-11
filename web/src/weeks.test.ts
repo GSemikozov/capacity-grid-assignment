@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { isoWeek, isValidDate, MAX_WEEKS, rangeOf, shiftRange, startOfWeek, weekCount, withFrom, withTo } from './weeks'
+import {
+  isoWeek,
+  isValidDate,
+  MAX_WEEKS,
+  rangeFromSearch,
+  rangeOf,
+  shiftRange,
+  startOfWeek,
+  weekCount,
+  withFrom,
+  withTo,
+} from './weeks'
 
 describe('weeks', () => {
   it('treats Monday as the first day and Sunday as the last', () => {
@@ -47,5 +58,13 @@ describe('weeks', () => {
     expect(isValidDate('0002-01-05')).toBe(false)
     expect(isValidDate('2026-02-30')).toBe(false)
     expect(isValidDate('')).toBe(false)
+  })
+
+  it('reads a range from the URL and ignores one it cannot use', () => {
+    expect(rangeFromSearch('?from=2026-01-07&to=2026-01-14')).toEqual({ from: '2026-01-05', to: '2026-01-18' })
+    expect(rangeFromSearch('')).toBeNull()
+    expect(rangeFromSearch('?from=2026-01-14&to=2026-01-07')).toBeNull()
+    expect(rangeFromSearch('?from=2026-01-05&to=nope')).toBeNull()
+    expect(rangeFromSearch('?from=2025-01-06&to=2026-12-31')).toBeNull()
   })
 })

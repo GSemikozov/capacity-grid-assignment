@@ -77,6 +77,16 @@ export function withTo(range: WeekRange, date: string): WeekRange {
   return { from, to }
 }
 
+/** The range in `?from=&to=`, or null when it's missing, malformed or too wide. */
+export function rangeFromSearch(search: string): WeekRange | null {
+  const params = new URLSearchParams(search)
+  const from = params.get('from') ?? ''
+  const to = params.get('to') ?? ''
+  if (!isValidDate(from) || !isValidDate(to) || to < from) return null
+  const range = rangeOf(from, to)
+  return weekCount(range) <= MAX_WEEKS ? range : null
+}
+
 const dayMonth = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })
 const dayMonthYear = new Intl.DateTimeFormat('en-GB', {
   day: 'numeric',
