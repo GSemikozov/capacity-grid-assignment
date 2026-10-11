@@ -1,11 +1,22 @@
 :root {
   color-scheme: light dark;
   font-family: ui-sans-serif, system-ui, sans-serif;
+  --bg: Canvas;
+  --fg: CanvasText;
+  --muted: color-mix(in srgb, currentColor 60%, transparent);
+  --line: color-mix(in srgb, currentColor 18%, transparent);
+  --load-fill: color-mix(in srgb, #3b82f6 22%, transparent);
+  --over-bg: color-mix(in srgb, #dc2626 20%, var(--bg));
+  --over-fg: light-dark(#b91c1c, #fca5a5);
+  --current: color-mix(in srgb, #3b82f6 8%, transparent);
+  --focus: light-dark(#2563eb, #93c5fd);
 }
 
 body {
   margin: 0;
   padding: 2rem;
+  background: var(--bg);
+  color: var(--fg);
 }
 
 h1 {
@@ -13,20 +24,288 @@ h1 {
   margin: 0 0 0.25rem;
 }
 
-.range {
-  margin: 0 0 1.5rem;
+.lede {
+  margin: 0 0 1.25rem;
+  color: var(--muted);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+button[aria-disabled='true'] {
+  cursor: default;
   opacity: 0.6;
+}
+
+/* Range controls */
+
+.range-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  align-items: end;
+  margin-bottom: 1rem;
+}
+
+.range-nav,
+.range-dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: end;
+}
+
+.range-dates label {
+  display: grid;
+  gap: 0.15rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.range-dates input {
+  font: inherit;
+  color: var(--fg);
+}
+
+.range-hint {
+  font-size: 0.85rem;
+  color: var(--muted);
+  padding-bottom: 0.2rem;
+}
+
+/* Status and errors */
+
+.grid-status {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.grid-summary {
+  margin: 0;
   font-variant-numeric: tabular-nums;
 }
 
-table {
-  border-collapse: collapse;
-  font-variant-numeric: tabular-nums;
+.notice {
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
 }
 
-th,
-td {
-  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
-  padding: 0.5rem 0.75rem;
+.notice--error {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  border-color: var(--over-fg);
+  color: var(--over-fg);
+}
+
+.notice--error p {
+  margin: 0;
+}
+
+/* Grid */
+
+.grid-scroll {
+  overflow: auto;
+  max-height: calc(100vh - 14rem);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.grid {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  transition: opacity 150ms;
+}
+
+.grid--stale {
+  opacity: 0.55;
+}
+
+.grid th,
+.grid td {
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 0.35rem 0.6rem;
   text-align: left;
+  white-space: nowrap;
+  background: var(--bg);
+}
+
+.grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  font-size: 0.85rem;
+  vertical-align: bottom;
+}
+
+.grid .col-name {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 11rem;
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+.grid .col-hours {
+  position: sticky;
+  /* .col-name width plus its horizontal padding. */
+  left: 12.2rem;
+  z-index: 1;
+  min-width: 7rem;
+}
+
+.grid thead .col-name,
+.grid thead .col-hours {
+  z-index: 3;
+}
+
+.col-week {
+  min-width: 4.5rem;
+  text-align: right !important;
+}
+
+.col-week time,
+.week-number {
+  display: block;
+}
+
+.week-number {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.week-over {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--over-fg);
+}
+
+.grid .is-current {
+  background-image: linear-gradient(var(--current), var(--current));
+}
+
+/* Allocation cells: a bar shows how full the week is, over-capacity is red and labelled. */
+
+.alloc {
+  text-align: right !important;
+  background-image: linear-gradient(to top, var(--load-fill), var(--load-fill));
+  background-size: 100% calc(var(--load) * 100%);
+  background-position: bottom;
+  background-repeat: no-repeat;
+}
+
+.alloc--empty .alloc-hours {
+  color: var(--muted);
+}
+
+.grid .alloc--over {
+  background: var(--over-bg);
+  color: var(--over-fg);
+  font-weight: 600;
+}
+
+.alloc-over {
+  margin-left: 0.35rem;
+  font-size: 0.75rem;
+}
+
+/* Weekly hours */
+
+.hours {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.hours-button {
+  background: none;
+  border: 1px dashed var(--line);
+  border-radius: 4px;
+  padding: 0.1rem 0.4rem;
+  color: inherit;
+}
+
+.hours-button:hover:not([aria-disabled='true']) {
+  border-style: solid;
+}
+
+.hours-saving {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.hours-editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  align-items: center;
+  max-width: 11rem;
+}
+
+.hours-editor input {
+  width: 4rem;
+  font: inherit;
+}
+
+.hours-editor input[aria-invalid='true'] {
+  border-color: var(--over-fg);
+}
+
+.hours-editor button {
+  padding: 0.05rem 0.35rem;
+}
+
+.hours-error {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 0.75rem;
+  white-space: normal;
+  color: var(--over-fg);
+}
+
+/* On a phone two pinned columns would cover the weeks; pin only the name. */
+@media (max-width: 640px) {
+  body {
+    padding: 1rem;
+  }
+
+  .grid .col-name {
+    min-width: 7.5rem;
+    max-width: 7.5rem;
+  }
+
+  .grid .col-hours {
+    left: auto;
+  }
+
+  .grid tbody .col-hours {
+    position: static;
+  }
 }
