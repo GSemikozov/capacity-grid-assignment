@@ -82,3 +82,43 @@ left unfinished. Append as you go; a line or two per entry is right.
 - Range in the URL, sorting/filtering to "over-allocated only".
 - No Go handler tests against a real database; the query was checked against an independent
   recomputation from the seed instead (see API notes).
+
+## Data, second look
+
+- Every third week is empty for all 500 people (2025-06-16, 07-07, 07-28 … 2026-01-12 has only
+  the four hand-written rows). Assignments start on a Monday every three weeks and last at most
+  13 days, so the third week never gets any. Reads as the seed generator's pattern, not a query
+  bug: the per-person-week numbers still match the independent recomputation. Left as is.
+
+## Cross-check against a second implementation
+
+A parallel attempt (different session, its own branch, no Docker in its sandbox) was run here
+against the same database on other ports, so its numbers were checked for the first time:
+
+- Its API returns the same numbers as this one on five ranges (year boundary, both ends of the
+  data, 26 weeks): 0 mismatches. Two independent queries agreeing is the best evidence I have
+  that the weekday/sum-every-row reading is applied consistently.
+- Taken from it, one commit each:
+  - Log database errors in the API; skip requests the client already abandoned. Before, a
+    failing query was a bare 500 with nothing in the logs.
+  - Range in `?from=&to=` (was in "Not done" above). `replaceState`, not `pushState`: a history
+    entry per "Next week" click would bury Back. A bad or too-wide URL range falls back to the
+    default.
+  - Weekly hours in a text field with `inputMode="decimal"`, accepting "37,5". Replaces the
+    `type=number` + `noValidate` fix above: no browser bubble, no scroll-wheel edits.
+  - Failed-save wording: an error response means nothing changed → "Not saved: … Still 40 h."
+    No response (offline, 504) means the write may have landed → "may not have been saved"; the
+    post-save refetch then shows what's stored. A 5xx's message isn't shown — "could not save
+    weekly hours" after "Not saved:" said nothing new.
+  - "N over" per week in the column header; "no capacity" instead of "+20" for zero hours.
+- Not taken:
+  - "Only over-allocated" filter: saving someone out of over-allocation removed their row from
+    under the editor — the confirmation vanished and focus fell to `<body>`. Reproduced in the
+    browser. A filter needs to keep rows with an open or just-finished edit; deferred.
+  - "Whole team" totals row: the sum of 500 people's hours isn't something a manager acts on.
+  - Pessimistic save with the input disabled. Its argument (don't show an over-allocation
+    disappearing and then coming back) is fair; I kept optimistic because the rollback is
+    per-person and the failure is spelled out in place.
+  - 26-week cap in the API and 80 h max weekly hours. Product calls; kept 106 weeks / 168 h.
+- Also seen there: opening its editor doesn't select the value, so typing 36 over 40 gives
+  "4036". This one selects on focus.
