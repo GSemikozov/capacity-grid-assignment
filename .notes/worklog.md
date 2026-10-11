@@ -79,7 +79,7 @@ left unfinished. Append as you go; a line or two per entry is right.
 - People pagination / team scoping in the API and row virtualisation in the grid. The
   endpoint returns the whole roster for the range.
 - Effective-dated capacity (see API notes) and holidays / time off.
-- Range in the URL, sorting/filtering to "over-allocated only".
+- Sorting, and an "over-allocated only" filter that keeps a row with an open edit (see below).
 - No Go handler tests against a real database; the query was checked against an independent
   recomputation from the seed instead (see API notes).
 
@@ -101,7 +101,7 @@ against the same database on other ports, so its numbers were checked for the fi
 - Taken from it, one commit each:
   - Log database errors in the API; skip requests the client already abandoned. Before, a
     failing query was a bare 500 with nothing in the logs.
-  - Range in `?from=&to=` (was in "Not done" above). `replaceState`, not `pushState`: a history
+  - Range in `?from=&to=` (previously deferred). `replaceState`, not `pushState`: a history
     entry per "Next week" click would bury Back. A bad or too-wide URL range falls back to the
     default.
   - Weekly hours in a text field with `inputMode="decimal"`, accepting "37,5". Replaces the
