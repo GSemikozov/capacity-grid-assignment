@@ -49,12 +49,13 @@ export function WeeklyHoursCell({ person, disabled }: Props) {
     setEditor({ value: String(person.weeklyHours), autoFocus: true })
   }
 
-  function close() {
-    restoreFocus.current = true
+  /** Pass false when focus has already moved elsewhere, so it isn't pulled back to this cell. */
+  function close(restoreFocusToCell = true) {
+    restoreFocus.current = restoreFocusToCell
     setEditor(null)
   }
 
-  function save() {
+  function save(restoreFocusToCell = true) {
     if (!editor) return
     const parsed = parseWeeklyHours(editor.value)
     if (typeof parsed === 'string') {
@@ -62,7 +63,7 @@ export function WeeklyHoursCell({ person, disabled }: Props) {
       return
     }
     const typed = editor.value
-    close()
+    close(restoreFocusToCell)
     if (parsed === person.weeklyHours) return
     mutation.mutate(
       { id: person.id, weeklyHours: parsed },
@@ -90,7 +91,7 @@ export function WeeklyHoursCell({ person, disabled }: Props) {
     if (event.currentTarget.contains(event.relatedTarget)) return
     // Don't resubmit a failed save or an invalid value just because focus moved on.
     if (editor?.error) return
-    save()
+    save(false)
   }
 
   if (editor) {
@@ -118,7 +119,7 @@ export function WeeklyHoursCell({ person, disabled }: Props) {
           onFocus={(event) => event.currentTarget.select()}
         />
         <button type="submit">{editor.failedSave ? 'Retry' : 'Save'}</button>
-        <button type="button" onClick={close} aria-label="Cancel">
+        <button type="button" onClick={() => close()} aria-label="Cancel">
           ✕
         </button>
         {editor.error && (

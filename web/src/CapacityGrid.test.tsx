@@ -154,6 +154,25 @@ describe('CapacityGrid', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/people/4', expect.objectContaining({ body: '{"weeklyHours":37.5}' }))
   })
 
+  it('saves when focus leaves the editor and lets focus go where it went', async () => {
+    patchResponse = async () => {
+      stored.people[0] = { ...stored.people[0], weeklyHours: 45 }
+      return json({ id: 4, name: 'Dee Okafor', weeklyHours: 45 })
+    }
+    renderGrid()
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: /Weekly hours for Dee Okafor/ }))
+    await user.keyboard('45')
+    // Input → Save → Cancel → out of the editor, onto the next row.
+    await user.tab()
+    await user.tab()
+    await user.tab()
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/people/4', expect.objectContaining({ body: '{"weeklyHours":45}' }))
+    await screen.findByRole('button', { name: /Weekly hours for Dee Okafor: 45/ })
+    expect(screen.getByRole('button', { name: /Weekly hours for Eli Nakamura/ })).toHaveFocus()
+  })
+
   it('cancels with Escape and returns focus to the cell', async () => {
     renderGrid()
     const user = userEvent.setup()
