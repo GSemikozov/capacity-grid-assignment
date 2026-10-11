@@ -145,6 +145,23 @@ describe('CapacityGrid', () => {
     )
   })
 
+  it('puts back what each cached range had, not one range\'s value everywhere', async () => {
+    const { showRange } = renderGrid()
+    expect(await screen.findByRole('button', { name: /Weekly hours for Dee Okafor: 40/ })).toBeInTheDocument()
+
+    // Someone else sets Dee to 32 h; the next range loads that, the first range stays cached at 40.
+    stored.people[0] = { ...stored.people[0], weeklyHours: 32 }
+    showRange(nextRange)
+    expect(await screen.findByRole('button', { name: /Weekly hours for Dee Okafor: 32/ })).toBeInTheDocument()
+
+    serverDown = true
+    patchResponse = async () => json({ error: 'database unavailable' }, 500)
+    await editWeeklyHours('Dee Okafor', '45')
+
+    expect(await screen.findByText(/Not saved/)).toHaveTextContent('Still 32 h.')
+    expect(within(row('Dee Okafor')).getByText(/13 over capacity/)).toBeInTheDocument()
+  })
+
   it('says a save may not have landed when the server never answered', async () => {
     patchResponse = () => Promise.reject(new TypeError('Failed to fetch'))
     renderGrid()

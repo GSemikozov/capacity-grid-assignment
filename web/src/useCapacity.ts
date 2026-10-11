@@ -46,12 +46,19 @@ export function useUpdateWeeklyHours() {
         queryKey: capacityRoot,
         predicate: (query) => query.state.data !== undefined,
       })
-      const previous = cachedWeeklyHours(queryClient, id)
+      // Remember what each cached range had: ranges loaded at different times
+      // can disagree, and a rollback must not copy one range's value into another.
+      const previous = queryClient
+        .getQueriesData<CapacityResponse>({ queryKey: capacityRoot })
+        .map(([key, data]) => [key, data?.people.find((p) => p.id === id)?.weeklyHours] as const)
       setCachedWeeklyHours(queryClient, id, weeklyHours)
       return { previous }
     },
     onError: (_error, { id }, context) => {
-      if (context?.previous !== undefined) setCachedWeeklyHours(queryClient, id, context.previous)
+      for (const [key, weeklyHours] of context?.previous ?? []) {
+        if (weeklyHours === undefined) continue
+        queryClient.setQueryData<CapacityResponse>(key, (data) => data && withWeeklyHours(data, id, weeklyHours))
+      }
     },
     onSuccess: (person) => {
       setCachedWeeklyHours(queryClient, person.id, person.weeklyHours)
@@ -67,22 +74,17 @@ export function useUpdateWeeklyHours() {
   })
 }
 
-function cachedWeeklyHours(queryClient: QueryClient, id: number): number | undefined {
-  for (const [, data] of queryClient.getQueriesData<CapacityResponse>({ queryKey: capacityRoot })) {
-    const person = data?.people.find((p) => p.id === id)
-    if (person) return person.weeklyHours
-  }
-  return undefined
+function setCachedWeeklyHours(queryClient: QueryClient, id: number, weeklyHours: number) {
+  queryClient.setQueriesData<CapacityResponse>(
+    { queryKey: capacityRoot },
+    (data) => data && withWeeklyHours(data, id, weeklyHours),
+  )
 }
 
-function setCachedWeeklyHours(queryClient: QueryClient, id: number, weeklyHours: number) {
-  queryClient.setQueriesData<CapacityResponse>({ queryKey: capacityRoot }, (data) =>
-    data
-      ? {
-          ...data,
-          // Untouched rows keep their identity, so memoised rows don't re-render.
-          people: data.people.map((p) => (p.id === id ? { ...p, weeklyHours } : p)),
-        }
-      : data,
-  )
+function withWeeklyHours(data: CapacityResponse, id: number, weeklyHours: number): CapacityResponse {
+  return {
+    ...data,
+    // Untouched rows keep their identity, so memoised rows don't re-render.
+    people: data.people.map((p) => (p.id === id ? { ...p, weeklyHours } : p)),
+  }
 }
