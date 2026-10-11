@@ -33,7 +33,8 @@ type UpdateVariables = { id: number; weeklyHours: number }
  * - Either way, once the last save settles the cached ranges are refetched.
  *   Allocation doesn't depend on capacity, so this isn't needed for the edited
  *   number; it reconciles anything else (a failed response whose write did
- *   land, edits by someone else, refetches cancelled by the optimistic update).
+ *   land, edits by someone else, refetches cancelled by the optimistic update,
+ *   a first load that read the old value before the write committed).
  */
 export function useUpdateWeeklyHours() {
   const queryClient = useQueryClient()
@@ -42,8 +43,13 @@ export function useUpdateWeeklyHours() {
     mutationFn: ({ id, weeklyHours }: UpdateVariables) => updateWeeklyHours(id, weeklyHours),
     onMutate: async ({ id, weeklyHours }) => {
       // A refetch already in flight would land with the old value and
-      // overwrite the optimistic one.
-      await queryClient.cancelQueries({ queryKey: capacityRoot })
+      // overwrite the optimistic one. A range's first load has nothing to
+      // overwrite, so let it finish: cancelling it would leave that range
+      // unloaded until a save settles. onSuccess patches it once it's there.
+      await queryClient.cancelQueries({
+        queryKey: capacityRoot,
+        predicate: (query) => query.state.data !== undefined,
+      })
       const previous = cachedWeeklyHours(queryClient, id)
       setCachedWeeklyHours(queryClient, id, weeklyHours)
       return { previous }

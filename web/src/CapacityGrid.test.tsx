@@ -177,6 +177,30 @@ describe('CapacityGrid', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
+  it('lets a range finish loading while a save is in flight', async () => {
+    const { showRange } = renderGrid()
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: /Weekly hours for Dee Okafor/ }))
+    await user.keyboard('45')
+
+    // The manager moves on with the editor still open, then saves.
+    const nextLoad = deferred()
+    rangeResponse[nextRange.from] = () => nextLoad.promise
+    showRange(nextRange)
+    const save = deferred()
+    patchResponse = () => save.promise
+    await user.keyboard('{Enter}')
+
+    nextLoad.resolve(json({ ...stored, ...nextRange, weeks: [nextRange.from, addDays(nextRange.from, 7)] }))
+    // The new range shows up without waiting for the save.
+    expect(await screen.findByRole('columnheader', { name: /19 Jan/ })).toBeInTheDocument()
+
+    delete rangeResponse[nextRange.from]
+    stored.people[0] = { ...stored.people[0], weeklyHours: 45 }
+    save.resolve(json({ id: 4, name: 'Dee Okafor', weeklyHours: 45 }))
+    expect(await screen.findByRole('button', { name: /Weekly hours for Dee Okafor: 45/ })).toBeInTheDocument()
+  })
+
   it('rejects an impossible value without calling the server', async () => {
     renderGrid()
     await editWeeklyHours('Dee Okafor', '200')
