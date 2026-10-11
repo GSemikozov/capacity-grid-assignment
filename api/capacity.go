@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 )
@@ -78,23 +80,12 @@ func (s *server) handleCapacity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := s.db.Query(r.Context(), capacityQuery, first, last)
+	people, err := s.loadCapacity(r.Context(), first, last)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "could not load capacity")
-		return
-	}
-	defer rows.Close()
-
-	people := []personCapacity{}
-	for rows.Next() {
-		var p personCapacity
-		if err := rows.Scan(&p.ID, &p.Name, &p.WeeklyHours, &p.Allocated); err != nil {
-			writeError(w, http.StatusInternalServerError, "could not load capacity")
-			return
+		if r.Context().Err() != nil {
+			return // the client went away, e.g. it moved on to another range
 		}
-		people = append(people, p)
-	}
-	if err := rows.Err(); err != nil {
+		log.Printf("capacity %s..%s: %v", first.Format(dateLayout), last.AddDate(0, 0, 6).Format(dateLayout), err)
 		writeError(w, http.StatusInternalServerError, "could not load capacity")
 		return
 	}
@@ -110,6 +101,24 @@ func (s *server) handleCapacity(w http.ResponseWriter, r *http.Request) {
 		Weeks:  weeks,
 		People: people,
 	})
+}
+
+func (s *server) loadCapacity(ctx context.Context, first, last time.Time) ([]personCapacity, error) {
+	rows, err := s.db.Query(ctx, capacityQuery, first, last)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	people := []personCapacity{}
+	for rows.Next() {
+		var p personCapacity
+		if err := rows.Scan(&p.ID, &p.Name, &p.WeeklyHours, &p.Allocated); err != nil {
+			return nil, err
+		}
+		people = append(people, p)
+	}
+	return people, rows.Err()
 }
 
 // parseWeekRange parses inclusive from/to dates and returns the Mondays of

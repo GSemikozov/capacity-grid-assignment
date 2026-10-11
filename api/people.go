@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"math"
 	"net/http"
 	"strconv"
@@ -57,6 +58,7 @@ func (s *server) handleUpdatePerson(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
+		log.Printf("update person %d: %v", id, err)
 		writeError(w, http.StatusInternalServerError, "could not save weekly hours")
 		return
 	}
